@@ -1,0 +1,10 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+# App usa react-router (client-side routing) — sem isso, recarregar
+# /clientes/algum-slug direto no navegador dá 404 no Netlify.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
