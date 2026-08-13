@@ -7,18 +7,23 @@ import { Editable } from '../components/Editable'
 import { ClientAccessPanel } from '../components/ClientAccessPanel'
 import { FeedPostCard } from '../components/FeedPostCard'
 import { FeedCalendar } from '../components/FeedCalendar'
+import { FeedStats } from '../components/FeedStats'
+import { ActivityLog } from '../components/ActivityLog'
 import { weekOf, weekdayFromDate } from '../lib/weekday'
 import { downloadCsv, feedToCsv } from '../lib/csv'
 import {
   PILLAR_CLASS,
   PILLARS,
+  STATUSES,
   type CaptureItem,
   type ClientRow,
   type FeedPost,
+  type Pillar,
+  type PostStatus,
   type StoryItem,
 } from '../lib/types'
 
-type Tab = 'feed' | 'stories' | 'captacao' | 'acesso'
+type Tab = 'feed' | 'stories' | 'captacao' | 'historico' | 'acesso'
 type FeedView = 'lista' | 'calendario'
 
 export function ClientCalendar() {
@@ -34,6 +39,13 @@ export function ClientCalendar() {
   const [notFound, setNotFound] = useState(false)
   const [tab, setTab] = useState<Tab>('feed')
   const [feedView, setFeedView] = useState<FeedView>('lista')
+  const [searchText, setSearchText] = useState('')
+  const [activePillars, setActivePillars] = useState<Set<Pillar>>(new Set(PILLARS))
+  const [activeStatuses, setActiveStatuses] = useState<Set<PostStatus>>(
+    new Set(STATUSES.map((s) => s.value))
+  )
+  const [draggedStoryId, setDraggedStoryId] = useState<string | null>(null)
+  const [draggedCaptureId, setDraggedCaptureId] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -71,9 +83,19 @@ export function ClientCalendar() {
     }
   }, [slug])
 
+  const filteredFeed = useMemo(() => {
+    const q = searchText.trim().toLowerCase()
+    return feed.filter(
+      (p) =>
+        activePillars.has(p.pillar) &&
+        activeStatuses.has(p.status) &&
+        (!q || p.tema.toLowerCase().includes(q) || p.legenda.toLowerCase().includes(q))
+    )
+  }, [feed, searchText, activePillars, activeStatuses])
+
   const weeks = useMemo(() => {
     const groups = new Map<string, { label: string; items: FeedPost[] }>()
-    for (const post of feed) {
+    for (const post of filteredFeed) {
       const { key, label } = weekOf(post.post_date)
       if (!groups.has(key)) groups.set(key, { label, items: [] })
       groups.get(key)!.items.push(post)
@@ -81,7 +103,25 @@ export function ClientCalendar() {
     return [...groups.entries()]
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([key, v]) => ({ key, ...v }))
-  }, [feed])
+  }, [filteredFeed])
+
+  function togglePillarFilter(p: Pillar) {
+    setActivePillars((prev) => {
+      const next = new Set(prev)
+      if (next.has(p)) next.delete(p)
+      else next.add(p)
+      return next
+    })
+  }
+
+  function toggleStatusFilter(s: PostStatus) {
+    setActiveStatuses((prev) => {
+      const next = new Set(prev)
+      if (next.has(s)) next.delete(s)
+      else next.add(s)
+      return next
+    })
+  }
 
   async function updateFeedPost(id: string, patch: Partial<FeedPost>) {
     setFeed((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)))
@@ -143,6 +183,28 @@ export function ClientCalendar() {
     if (error) console.error(error.message)
   }
 
+  function reorderStories(targetId: string) {
+    const draggedId = draggedStoryId
+    setDraggedStoryId(null)
+    if (!draggedId || draggedId === targetId) return
+    setStories((prev) => {
+      const fromIdx = prev.findIndex((s) => s.id === draggedId)
+      const toIdx = prev.findIndex((s) => s.id === targetId)
+      if (fromIdx === -1 || toIdx === -1) return prev
+      const next = [...prev]
+      const [moved] = next.splice(fromIdx, 1)
+      next.splice(toIdx, 0, moved)
+      next.forEach((item, i) => {
+        supabase
+          .from('stories_template')
+          .update({ sort_order: i })
+          .eq('id', item.id)
+          .then(({ error }) => error && console.error(error.message))
+      })
+      return next.map((item, i) => ({ ...item, sort_order: i }))
+    })
+  }
+
   async function updateCapture(id: string, patch: Partial<CaptureItem>) {
     setCaptacao((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)))
     const { error } = await supabase.from('capture_guide').update(patch).eq('id', id)
@@ -166,6 +228,28 @@ export function ClientCalendar() {
     setCaptacao((prev) => prev.filter((c) => c.id !== id))
     const { error } = await supabase.from('capture_guide').delete().eq('id', id)
     if (error) console.error(error.message)
+  }
+
+  function reorderCapture(targetId: string) {
+    const draggedId = draggedCaptureId
+    setDraggedCaptureId(null)
+    if (!draggedId || draggedId === targetId) return
+    setCaptacao((prev) => {
+      const fromIdx = prev.findIndex((c) => c.id === draggedId)
+      const toIdx = prev.findIndex((c) => c.id === targetId)
+      if (fromIdx === -1 || toIdx === -1) return prev
+      const next = [...prev]
+      const [moved] = next.splice(fromIdx, 1)
+      next.splice(toIdx, 0, moved)
+      next.forEach((item, i) => {
+        supabase
+          .from('capture_guide')
+          .update({ sort_order: i })
+          .eq('id', item.id)
+          .then(({ error }) => error && console.error(error.message))
+      })
+      return next.map((item, i) => ({ ...item, sort_order: i }))
+    })
   }
 
   if (loading) return <div className="page-loading">Carregando cronograma…</div>
@@ -192,6 +276,11 @@ export function ClientCalendar() {
             Orientações de Captação
           </button>
           {canManage && (
+            <button className="tab" aria-selected={tab === 'historico'} onClick={() => setTab('historico')}>
+              Histórico
+            </button>
+          )}
+          {canManage && (
             <button className="tab" aria-selected={tab === 'acesso'} onClick={() => setTab('acesso')}>
               Acesso do Cliente
             </button>
@@ -200,13 +289,39 @@ export function ClientCalendar() {
 
         {tab === 'feed' && (
           <section>
-            <div className="legend">
-              {PILLARS.map((p) => (
-                <span className="chip" key={p}>
-                  <span className={`dot dot-${PILLAR_CLASS[p]}`} />
-                  {p}
-                </span>
-              ))}
+            <FeedStats feed={feed} />
+
+            <div className="filters-row">
+              <div className="legend">
+                {PILLARS.map((p) => (
+                  <button
+                    key={p}
+                    className={`chip chip-toggle ${activePillars.has(p) ? '' : 'chip-off'}`}
+                    onClick={() => togglePillarFilter(p)}
+                  >
+                    <span className={`dot dot-${PILLAR_CLASS[p]}`} />
+                    {p}
+                  </button>
+                ))}
+              </div>
+              <div className="legend">
+                {STATUSES.map((s) => (
+                  <button
+                    key={s.value}
+                    className={`chip chip-toggle ${activeStatuses.has(s.value) ? '' : 'chip-off'}`}
+                    onClick={() => toggleStatusFilter(s.value)}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+              <input
+                type="search"
+                className="filter-search"
+                placeholder="Buscar por tema ou legenda…"
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+              />
             </div>
 
             <div className="feed-toolbar">
@@ -226,8 +341,8 @@ export function ClientCalendar() {
                 )}
                 <button
                   className="btn-ghost"
-                  onClick={() => downloadCsv(`cronograma-${client.slug}.csv`, feedToCsv(feed))}
-                  disabled={feed.length === 0}
+                  onClick={() => downloadCsv(`cronograma-${client.slug}.csv`, feedToCsv(filteredFeed))}
+                  disabled={filteredFeed.length === 0}
                 >
                   Exportar CSV
                 </button>
@@ -235,6 +350,7 @@ export function ClientCalendar() {
             </div>
 
             {feed.length === 0 && <p className="muted">Nenhum post cadastrado ainda.</p>}
+            {feed.length > 0 && filteredFeed.length === 0 && <p className="muted">Nenhum post encontrado com esses filtros.</p>}
 
             {feedView === 'lista' &&
               weeks.map((week) => (
@@ -252,7 +368,7 @@ export function ClientCalendar() {
 
             {feedView === 'calendario' && (
               <FeedCalendar
-                feed={feed}
+                feed={filteredFeed}
                 canManage={canManage}
                 onUpdate={updateFeedPost}
                 onDelete={deleteFeedPost}
@@ -266,6 +382,7 @@ export function ClientCalendar() {
           <section>
             <p className="sub">
               Padrão semanal — repetir todas as semanas, usando material de bastidores enviado pelo cliente.
+              Arraste os cards pra reordenar.
             </p>
             {canManage && (
               <button className="btn-secondary" onClick={addStory}>
@@ -274,7 +391,15 @@ export function ClientCalendar() {
             )}
             <div className="story-grid">
               {stories.map((item) => (
-                <div className="story-card" key={item.id}>
+                <div
+                  className={`story-card ${draggedStoryId === item.id ? 'dragging' : ''}`}
+                  key={item.id}
+                  draggable
+                  onDragStart={() => setDraggedStoryId(item.id)}
+                  onDragEnd={() => setDraggedStoryId(null)}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={() => reorderStories(item.id)}
+                >
                   <Editable as="span" className="story-day" value={item.weekday} onSave={(v) => updateStory(item.id, { weekday: v })} />
                   <Editable as="span" className="story-type" value={item.tipo} onSave={(v) => updateStory(item.id, { tipo: v })} />
                   <Editable className="story-idea" value={item.ideia} onSave={(v) => updateStory(item.id, { ideia: v })} />
@@ -291,7 +416,7 @@ export function ClientCalendar() {
 
         {tab === 'captacao' && (
           <section>
-            <p className="sub">O que pedir para o cliente gravar/fotografar.</p>
+            <p className="sub">O que pedir para o cliente gravar/fotografar. Arraste as linhas pra reordenar.</p>
             {canManage && (
               <button className="btn-secondary" onClick={addCapture}>
                 + Novo item
@@ -299,7 +424,15 @@ export function ClientCalendar() {
             )}
             <div className="capture-list">
               {captacao.map((item) => (
-                <div className="capture-row" key={item.id}>
+                <div
+                  className={`capture-row ${draggedCaptureId === item.id ? 'dragging' : ''}`}
+                  key={item.id}
+                  draggable
+                  onDragStart={() => setDraggedCaptureId(item.id)}
+                  onDragEnd={() => setDraggedCaptureId(null)}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={() => reorderCapture(item.id)}
+                >
                   <Editable as="span" className="moment" value={item.momento} onSave={(v) => updateCapture(item.id, { momento: v })} />
                   <Editable className="detail" value={item.detalhe} onSave={(v) => updateCapture(item.id, { detalhe: v })} />
                   {canManage && (
@@ -312,6 +445,8 @@ export function ClientCalendar() {
             </div>
           </section>
         )}
+
+        {tab === 'historico' && canManage && <ActivityLog clientId={client.id} />}
 
         {tab === 'acesso' && canManage && <ClientAccessPanel client={client} />}
       </main>

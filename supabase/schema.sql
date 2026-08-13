@@ -276,3 +276,88 @@ begin
     );
   end if;
 end $$;
+
+-- ============================================================
+-- 9. Histórico de alterações (Fase 3)
+--    Só staff lê. Escrita só acontece pelo trigger abaixo (security
+--    definer), então não existe policy de insert pra client/staff.
+--
+--    client_id de propósito SEM foreign key: é um log de auditoria, deve
+--    sobreviver mesmo se o cliente original for apagado de verdade (via
+--    SQL direto — pelo painel só existe "arquivar"). Com FK + cascade,
+--    apagar um cliente quebrava, porque o trigger de feed_posts/stories/
+--    capture_guide tenta inserir no log referenciando um client_id que
+--    está sendo removido no mesmo cascade.
+-- ============================================================
+create table if not exists public.activity_log (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid not null,
+  table_name text not null,
+  row_id uuid not null,
+  action text not null check (action in ('insert', 'update', 'delete')),
+  actor_id uuid references public.profiles (id) on delete set null,
+  summary text not null,
+  created_at timestamptz not null default now()
+);
+
+alter table public.activity_log drop constraint if exists activity_log_client_id_fkey;
+alter table public.activity_log enable row level security;
+
+drop policy if exists "staff reads activity_log" on public.activity_log;
+create policy "staff reads activity_log" on public.activity_log
+  for select using (public.is_staff());
+
+-- Registra inserts/deletes sempre, e updates só quando algum campo de
+-- conteúdo de verdade mudou (ignora sort_order/updated_at/created_at, pra
+-- não poluir o histórico com reordenação por arrastar).
+create or replace function public.log_activity()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  cid uuid;
+  changes text;
+begin
+  if tg_op = 'DELETE' then
+    cid := old.client_id;
+    insert into public.activity_log (client_id, table_name, row_id, action, actor_id, summary)
+    values (cid, tg_table_name, old.id, 'delete', auth.uid(), 'removeu o item');
+    return old;
+  end if;
+
+  if tg_op = 'INSERT' then
+    insert into public.activity_log (client_id, table_name, row_id, action, actor_id, summary)
+    values (new.client_id, tg_table_name, new.id, 'insert', auth.uid(), 'criou o item');
+    return new;
+  end if;
+
+  select string_agg(format('%s: "%s" → "%s"', o.key, left(o.value, 60), left(n.value, 60)), '; ')
+  into changes
+  from jsonb_each_text(to_jsonb(old)) o
+  join jsonb_each_text(to_jsonb(new)) n using (key)
+  where o.key not in ('updated_at', 'created_at', 'id', 'client_id', 'sort_order')
+    and o.value is distinct from n.value;
+
+  if changes is not null then
+    insert into public.activity_log (client_id, table_name, row_id, action, actor_id, summary)
+    values (new.client_id, tg_table_name, new.id, 'update', auth.uid(), changes);
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists on_feed_posts_activity on public.feed_posts;
+create trigger on_feed_posts_activity
+  after insert or update or delete on public.feed_posts
+  for each row execute procedure public.log_activity();
+
+drop trigger if exists on_stories_template_activity on public.stories_template;
+create trigger on_stories_template_activity
+  after insert or update or delete on public.stories_template
+  for each row execute procedure public.log_activity();
+
+drop trigger if exists on_capture_guide_activity on public.capture_guide;
+create trigger on_capture_guide_activity
+  after insert or update or delete on public.capture_guide
+  for each row execute procedure public.log_activity();

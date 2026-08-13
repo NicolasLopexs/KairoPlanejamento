@@ -19,6 +19,9 @@ cliente.
   `client`) e, se for `client`, a um `client_id`.
 - `feed_posts`, `stories_template`, `capture_guide` — o conteúdo de cada
   cliente, sempre amarrado a um `client_id`.
+- `activity_log` — histórico de criação/edição/remoção nas três tabelas
+  acima, gerado automaticamente por trigger (ninguém escreve nela direto).
+  Só staff lê, na aba **Histórico** de cada cliente.
 
 Regras de acesso (Row Level Security, já definidas em `supabase/schema.sql`):
 
@@ -177,4 +180,3 @@ npm run dev
 ## O que ainda não tem (próximos passos possíveis)
 
 - Exportar como PDF de verdade (hoje só tem CSV — abre liso no Excel/Sheets).
-- Histórico de alterações / quem editou o quê.
