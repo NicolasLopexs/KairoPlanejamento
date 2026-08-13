@@ -7,6 +7,10 @@ cliente.
 - **Front-end:** Vite + React + TypeScript
 - **Banco/autenticação:** Supabase (Postgres + Auth + Row Level Security)
 - **Hospedagem:** Netlify (deploy automático a cada push no GitHub)
+- **Repositório:** público no GitHub (necessário no plano gratuito do
+  Netlify pra reconhecer mais de um contribuidor Git). Nenhum segredo fica
+  no código — chaves reais vivem só em `.env.local` (fora do Git) e nas
+  variáveis de ambiente do Netlify.
 
 ## Como os dados são organizados
 
