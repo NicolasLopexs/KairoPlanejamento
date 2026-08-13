@@ -19,6 +19,7 @@ export interface ClientRow {
   id: string
   name: string
   slug: string
+  archived_at: string | null
   created_at: string
 }
 

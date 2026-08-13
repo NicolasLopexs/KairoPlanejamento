@@ -9,8 +9,12 @@ create table if not exists public.clients (
   id uuid primary key default gen_random_uuid(),
   name text not null,
   slug text not null unique,
+  archived_at timestamptz,
   created_at timestamptz not null default now()
 );
+
+-- Se a tabela já existia antes desta coluna, garante que ela apareça.
+alter table public.clients add column if not exists archived_at timestamptz;
 
 -- ============================================================
 -- 2. Perfis (liga cada login do Supabase Auth a um papel + cliente)

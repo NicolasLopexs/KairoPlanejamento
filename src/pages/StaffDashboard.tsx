@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { TopBar } from '../components/TopBar'
@@ -19,6 +19,8 @@ export function StaffDashboard() {
   const [newName, setNewName] = useState('')
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showArchived, setShowArchived] = useState(false)
+  const [busyId, setBusyId] = useState<string | null>(null)
 
   async function load() {
     setLoading(true)
@@ -30,6 +32,12 @@ export function StaffDashboard() {
   useEffect(() => {
     load()
   }, [])
+
+  const visibleClients = useMemo(
+    () => clients.filter((c) => (showArchived ? c.archived_at : !c.archived_at)),
+    [clients, showArchived]
+  )
+  const archivedCount = useMemo(() => clients.filter((c) => c.archived_at).length, [clients])
 
   async function handleCreate(e: FormEvent) {
     e.preventDefault()
@@ -44,6 +52,23 @@ export function StaffDashboard() {
       return
     }
     setNewName('')
+    load()
+  }
+
+  async function handleArchive(id: string) {
+    if (!confirm('Arquivar este cliente? Ele some da lista principal, mas o cronograma continua salvo.')) return
+    setBusyId(id)
+    const { error } = await supabase.from('clients').update({ archived_at: new Date().toISOString() }).eq('id', id)
+    setBusyId(null)
+    if (error) return setError(error.message)
+    load()
+  }
+
+  async function handleRestore(id: string) {
+    setBusyId(id)
+    const { error } = await supabase.from('clients').update({ archived_at: null }).eq('id', id)
+    setBusyId(null)
+    if (error) return setError(error.message)
     load()
   }
 
@@ -64,17 +89,36 @@ export function StaffDashboard() {
         </form>
         {error && <p className="form-error">{error}</p>}
 
+        {archivedCount > 0 && (
+          <button className="btn-ghost archive-toggle" onClick={() => setShowArchived((v) => !v)}>
+            {showArchived ? '← Ver clientes ativos' : `Ver arquivados (${archivedCount})`}
+          </button>
+        )}
+
         {loading ? (
           <p className="muted">Carregando clientes…</p>
-        ) : clients.length === 0 ? (
-          <p className="muted">Nenhum cliente ainda. Adicione o primeiro acima.</p>
+        ) : visibleClients.length === 0 ? (
+          <p className="muted">
+            {showArchived ? 'Nenhum cliente arquivado.' : 'Nenhum cliente ainda. Adicione o primeiro acima.'}
+          </p>
         ) : (
           <div className="client-grid">
-            {clients.map((c) => (
-              <Link key={c.id} to={`/clientes/${c.slug}`} className="client-tile">
-                <span className="client-tile-name">{c.name}</span>
-                <span className="client-tile-slug">/clientes/{c.slug}</span>
-              </Link>
+            {visibleClients.map((c) => (
+              <div className="client-tile" key={c.id}>
+                <Link to={`/clientes/${c.slug}`} className="client-tile-link">
+                  <span className="client-tile-name">{c.name}</span>
+                  <span className="client-tile-slug">/clientes/{c.slug}</span>
+                </Link>
+                {c.archived_at ? (
+                  <button className="btn-ghost" disabled={busyId === c.id} onClick={() => handleRestore(c.id)}>
+                    Reativar
+                  </button>
+                ) : (
+                  <button className="btn-danger-ghost" disabled={busyId === c.id} onClick={() => handleArchive(c.id)}>
+                    Arquivar
+                  </button>
+                )}
+              </div>
             ))}
           </div>
         )}

@@ -68,6 +68,10 @@ export function ClientAccessPanel({ client }: { client: ClientRow }) {
   async function handleCreate(e: FormEvent) {
     e.preventDefault()
     if (!email.trim() || !password.trim()) return
+    if (password.length < 6) {
+      setError('A senha precisa ter pelo menos 6 caracteres.')
+      return
+    }
     setCreating(true)
     setError(null)
     try {

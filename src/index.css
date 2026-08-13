@@ -80,6 +80,28 @@ body {
 .topbar-actions { display: flex; align-items: center; gap: 14px; }
 .who { font-size: 12.5px; color: var(--muted); }
 
+.account-menu { position: relative; }
+.who-button {
+  font-family: inherit; background: transparent; border: 1px solid transparent; cursor: pointer;
+  border-radius: 6px; padding: 4px 6px; margin: -4px -6px;
+}
+.who-button:hover { border-color: var(--border); background: var(--surface-2); }
+.account-panel {
+  position: absolute; top: calc(100% + 8px); right: 0; z-index: 20; width: 280px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  box-shadow: var(--shadow); padding: 16px; display: flex; flex-direction: column; gap: 16px;
+}
+.account-section { display: flex; flex-direction: column; gap: 8px; }
+.account-section-title { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 700; }
+.account-section input {
+  font-family: inherit; font-size: 13.5px; padding: 8px 10px; border-radius: 7px;
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--ink); width: 100%;
+}
+.account-inline-field { display: flex; gap: 8px; }
+.account-inline-field input { flex: 1; }
+.account-msg { font-size: 12px; color: var(--accent); margin: 0; }
+.account-msg-error { color: #b3473f; }
+
 .page-content { max-width: 1180px; margin: 0 auto; padding: 28px; }
 .page-loading { padding: 60px 28px; text-align: center; color: var(--muted); }
 
@@ -126,13 +148,14 @@ body {
 
 .client-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
 .client-tile {
-  background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px;
-  box-shadow: var(--shadow); text-decoration: none; color: var(--ink);
-  display: flex; flex-direction: column; gap: 4px; transition: border-color .15s;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px;
+  box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 10px; transition: border-color .15s;
 }
-.client-tile:hover { border-color: var(--accent); }
+.client-tile:has(.client-tile-link:hover) { border-color: var(--accent); }
+.client-tile-link { text-decoration: none; color: var(--ink); display: flex; flex-direction: column; gap: 4px; }
 .client-tile-name { font-family: Georgia, serif; font-size: 16px; }
 .client-tile-slug { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.archive-toggle { margin-bottom: 16px; }
 
 .tabs { display: flex; gap: 6px; background: var(--surface-2); padding: 5px; border-radius: 11px; border: 1px solid var(--border); width: fit-content; margin-bottom: 22px; }
 .tab {

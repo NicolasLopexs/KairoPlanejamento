@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { AccountMenu } from './AccountMenu'
 
 export function TopBar({ title, eyebrow }: { title: string; eyebrow: string }) {
   const { profile, signOut } = useAuth()
@@ -14,11 +15,7 @@ export function TopBar({ title, eyebrow }: { title: string; eyebrow: string }) {
           <h1>{title}</h1>
         </div>
         <div className="topbar-actions">
-          {profile && (
-            <span className="who">
-              {profile.full_name || 'Sem nome'} · {profile.role === 'staff' ? 'equipe' : 'cliente'}
-            </span>
-          )}
+          {profile && <AccountMenu />}
           <button className="btn-ghost" onClick={() => signOut()}>
             Sair
           </button>
