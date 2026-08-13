@@ -44,6 +44,10 @@ export function ClientAccessPanel({ client }: { client: ClientRow }) {
   const [creating, setCreating] = useState(false)
   const [lastCreated, setLastCreated] = useState<{ email: string; password: string } | null>(null)
 
+  const [contactEmail, setContactEmail] = useState('')
+  const [savingContact, setSavingContact] = useState(false)
+  const [contactMsg, setContactMsg] = useState<string | null>(null)
+
   const load = useCallback(async () => {
     setLoading(true)
     const [accessesRes, clientsRes] = await Promise.all([
@@ -62,8 +66,26 @@ export function ClientAccessPanel({ client }: { client: ClientRow }) {
   useEffect(() => {
     setEmail(suggestEmail(client.slug))
     setLastCreated(null)
+    setContactEmail(client.contact_email ?? '')
+    setContactMsg(null)
     load()
-  }, [client.slug, load])
+  }, [client.slug, client.contact_email, load])
+
+  async function handleSaveContact(e: FormEvent) {
+    e.preventDefault()
+    setSavingContact(true)
+    setContactMsg(null)
+    const { error } = await supabase
+      .from('clients')
+      .update({ contact_email: contactEmail.trim() || null })
+      .eq('id', client.id)
+    setSavingContact(false)
+    if (error) {
+      setContactMsg(error.message)
+      return
+    }
+    setContactMsg('Salvo.')
+  }
 
   async function handleCreate(e: FormEvent) {
     e.preventDefault()
@@ -143,6 +165,26 @@ export function ClientAccessPanel({ client }: { client: ClientRow }) {
 
   return (
     <section>
+      <form className="contact-form" onSubmit={handleSaveContact}>
+        <h3>Avisos por e-mail</h3>
+        <p className="sub">
+          E-mail de verdade pra onde mandar avisos automáticos (mudança de status, posts com data
+          chegando perto). É diferente do e-mail de login abaixo, que pode ser fictício.
+        </p>
+        <div className="account-inline-field">
+          <input
+            type="email"
+            placeholder="contato@cliente.com"
+            value={contactEmail}
+            onChange={(e) => setContactEmail(e.target.value)}
+          />
+          <button className="btn-ghost" type="submit" disabled={savingContact}>
+            {savingContact ? 'Salvando…' : 'Salvar'}
+          </button>
+        </div>
+        {contactMsg && <p className="account-msg">{contactMsg}</p>}
+      </form>
+
       <p className="sub">
         Crie um login pra este cliente acessar só o próprio cronograma. O e-mail não precisa ser real — só
         precisa ser único no sistema.

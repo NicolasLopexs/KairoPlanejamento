@@ -5,27 +5,21 @@ import { useAuth } from '../contexts/AuthContext'
 import { TopBar } from '../components/TopBar'
 import { Editable } from '../components/Editable'
 import { ClientAccessPanel } from '../components/ClientAccessPanel'
+import { FeedPostCard } from '../components/FeedPostCard'
+import { FeedCalendar } from '../components/FeedCalendar'
 import { weekOf, weekdayFromDate } from '../lib/weekday'
+import { downloadCsv, feedToCsv } from '../lib/csv'
 import {
+  PILLAR_CLASS,
   PILLARS,
-  STATUSES,
   type CaptureItem,
   type ClientRow,
   type FeedPost,
-  type Pillar,
-  type PostStatus,
   type StoryItem,
 } from '../lib/types'
 
 type Tab = 'feed' | 'stories' | 'captacao' | 'acesso'
-
-const PILLAR_CLASS: Record<Pillar, string> = {
-  Jogo: 'jogo',
-  Lifestyle: 'lifestyle',
-  Bastidores: 'bastidores',
-  Engajamento: 'engajamento',
-  Inspiração: 'inspiracao',
-}
+type FeedView = 'lista' | 'calendario'
 
 export function ClientCalendar() {
   const { slug } = useParams<{ slug: string }>()
@@ -39,6 +33,7 @@ export function ClientCalendar() {
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [tab, setTab] = useState<Tab>('feed')
+  const [feedView, setFeedView] = useState<FeedView>('lista')
 
   useEffect(() => {
     let cancelled = false
@@ -94,15 +89,15 @@ export function ClientCalendar() {
     if (error) console.error(error.message)
   }
 
-  async function addFeedPost() {
+  async function addFeedPost(onDate?: string) {
     if (!client) return
-    const today = new Date().toISOString().slice(0, 10)
+    const post_date = onDate ?? new Date().toISOString().slice(0, 10)
     const { data, error } = await supabase
       .from('feed_posts')
       .insert({
         client_id: client.id,
-        post_date: today,
-        weekday: weekdayFromDate(today),
+        post_date,
+        weekday: weekdayFromDate(post_date),
         week_label: '',
         format: 'Reels',
         pillar: 'Jogo',
@@ -214,110 +209,56 @@ export function ClientCalendar() {
               ))}
             </div>
 
-            {canManage && (
-              <button className="btn-secondary" onClick={addFeedPost}>
-                + Novo post
-              </button>
-            )}
-
-            {weeks.length === 0 && <p className="muted">Nenhum post cadastrado ainda.</p>}
-
-            {weeks.map((week) => (
-              <div className="week" key={week.key}>
-                <div className="week-head">
-                  <span className="wk-range">{week.label}</span>
-                </div>
-                <div className="cards">
-                  {week.items.map((item) => (
-                    <div
-                      className="card"
-                      key={item.id}
-                      style={
-                        {
-                          '--p-bg': `var(--p-${PILLAR_CLASS[item.pillar]}-bg)`,
-                          '--p-fg': `var(--p-${PILLAR_CLASS[item.pillar]}-fg)`,
-                          '--p-line': `var(--p-${PILLAR_CLASS[item.pillar]}-line)`,
-                        } as React.CSSProperties
-                      }
-                    >
-                      <div className="card-top">
-                        <div className="date-badge">
-                          <input
-                            type="date"
-                            className="date-input"
-                            value={item.post_date}
-                            onChange={(e) => {
-                              const post_date = e.target.value
-                              if (!post_date) return
-                              updateFeedPost(item.id, { post_date, weekday: weekdayFromDate(post_date) })
-                            }}
-                          />
-                          <span className="dow">{item.weekday}</span>
-                        </div>
-                        <div className="tag-row">
-                          <Editable
-                            as="span"
-                            className="tag"
-                            value={item.format}
-                            onSave={(v) => updateFeedPost(item.id, { format: v })}
-                          />
-                          <select
-                            className="pillar-select"
-                            value={item.pillar}
-                            style={
-                              {
-                                '--p-bg': `var(--p-${PILLAR_CLASS[item.pillar]}-bg)`,
-                                '--p-fg': `var(--p-${PILLAR_CLASS[item.pillar]}-fg)`,
-                              } as React.CSSProperties
-                            }
-                            onChange={(e) => updateFeedPost(item.id, { pillar: e.target.value as Pillar })}
-                          >
-                            {PILLARS.map((p) => (
-                              <option key={p} value={p}>
-                                {p}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-
-                      <div className="field-label">Tema / ideia</div>
-                      <Editable
-                        className="tema"
-                        value={item.tema}
-                        onSave={(v) => updateFeedPost(item.id, { tema: v })}
-                      />
-
-                      <div className="field-label">Legenda / CTA sugerida</div>
-                      <Editable
-                        className="legenda"
-                        value={item.legenda}
-                        onSave={(v) => updateFeedPost(item.id, { legenda: v })}
-                      />
-
-                      <div className="card-bottom">
-                        <select
-                          className={`status-select status-${item.status}`}
-                          value={item.status}
-                          onChange={(e) => updateFeedPost(item.id, { status: e.target.value as PostStatus })}
-                        >
-                          {STATUSES.map((s) => (
-                            <option key={s.value} value={s.value}>
-                              {s.label}
-                            </option>
-                          ))}
-                        </select>
-                        {canManage && (
-                          <button className="btn-danger-ghost" onClick={() => deleteFeedPost(item.id)}>
-                            Remover
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+            <div className="feed-toolbar">
+              <div className="tabs feed-view-toggle" role="tablist">
+                <button className="tab" aria-selected={feedView === 'lista'} onClick={() => setFeedView('lista')}>
+                  Lista
+                </button>
+                <button className="tab" aria-selected={feedView === 'calendario'} onClick={() => setFeedView('calendario')}>
+                  Calendário
+                </button>
               </div>
-            ))}
+              <div className="feed-toolbar-actions">
+                {canManage && feedView === 'lista' && (
+                  <button className="btn-secondary" onClick={() => addFeedPost()}>
+                    + Novo post
+                  </button>
+                )}
+                <button
+                  className="btn-ghost"
+                  onClick={() => downloadCsv(`cronograma-${client.slug}.csv`, feedToCsv(feed))}
+                  disabled={feed.length === 0}
+                >
+                  Exportar CSV
+                </button>
+              </div>
+            </div>
+
+            {feed.length === 0 && <p className="muted">Nenhum post cadastrado ainda.</p>}
+
+            {feedView === 'lista' &&
+              weeks.map((week) => (
+                <div className="week" key={week.key}>
+                  <div className="week-head">
+                    <span className="wk-range">{week.label}</span>
+                  </div>
+                  <div className="cards">
+                    {week.items.map((item) => (
+                      <FeedPostCard key={item.id} post={item} canManage={canManage} onUpdate={updateFeedPost} onDelete={deleteFeedPost} />
+                    ))}
+                  </div>
+                </div>
+              ))}
+
+            {feedView === 'calendario' && (
+              <FeedCalendar
+                feed={feed}
+                canManage={canManage}
+                onUpdate={updateFeedPost}
+                onDelete={deleteFeedPost}
+                onAddOnDate={(date) => addFeedPost(date)}
+              />
+            )}
           </section>
         )}
 

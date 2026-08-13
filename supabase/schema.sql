@@ -10,11 +10,13 @@ create table if not exists public.clients (
   name text not null,
   slug text not null unique,
   archived_at timestamptz,
+  contact_email text,
   created_at timestamptz not null default now()
 );
 
--- Se a tabela já existia antes desta coluna, garante que ela apareça.
+-- Se a tabela já existia antes destas colunas, garante que apareçam.
 alter table public.clients add column if not exists archived_at timestamptz;
+alter table public.clients add column if not exists contact_email text;
 
 -- ============================================================
 -- 2. Perfis (liga cada login do Supabase Auth a um papel + cliente)
@@ -200,3 +202,77 @@ drop policy if exists "client updates own capture_guide" on public.capture_guide
 create policy "client updates own capture_guide" on public.capture_guide
   for update using (client_id = public.my_client_id())
   with check (client_id = public.my_client_id());
+
+-- ============================================================
+-- 8. Avisos por e-mail (Fase 2)
+--    Extensões pg_net (chamar HTTP a partir do banco) e pg_cron (agendar
+--    tarefas) precisam estar habilitadas — normalmente já vêm assim em
+--    projetos Supabase recentes; se der erro aqui, habilite as duas em
+--    Database > Extensions no painel antes de rodar este bloco.
+--
+--    A service_role key fica guardada no Supabase Vault (tabela
+--    vault.secrets, nome 'service_role_key') em vez de escrita direto
+--    aqui — veja README para o passo de configurar isso uma vez.
+-- ============================================================
+
+create extension if not exists pg_net with schema extensions;
+create extension if not exists pg_cron with schema extensions;
+
+-- Dispara quando o status de um post muda, chamando a Edge Function
+-- notify-status-change (que só manda e-mail se o cliente tiver
+-- contact_email preenchido).
+create or replace function public.notify_status_change()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  service_key text;
+begin
+  if new.status is distinct from old.status then
+    select decrypted_secret into service_key from vault.decrypted_secrets where name = 'service_role_key';
+    if service_key is not null then
+      perform net.http_post(
+        url := 'https://radciehalkupwltjuaja.supabase.co/functions/v1/notify-status-change',
+        headers := jsonb_build_object('Content-Type', 'application/json', 'Authorization', 'Bearer ' || service_key),
+        body := jsonb_build_object(
+          'post_id', new.id,
+          'client_id', new.client_id,
+          'old_status', old.status,
+          'new_status', new.status
+        )
+      );
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists on_feed_post_status_change on public.feed_posts;
+create trigger on_feed_post_status_change
+  after update on public.feed_posts
+  for each row execute procedure public.notify_status_change();
+
+-- Job diário (12:00 UTC ~ 09:00 no horário de Brasília) que chama a Edge
+-- Function notify-upcoming-posts, avisando sobre posts com data pra
+-- amanhã que ainda estão como "planejado". cron.schedule com um nome que
+-- já existe substitui o agendamento antigo (idempotente).
+do $$
+declare service_key text;
+begin
+  select decrypted_secret into service_key from vault.decrypted_secrets where name = 'service_role_key';
+  if service_key is not null then
+    perform cron.schedule(
+      'notify-upcoming-posts-daily',
+      '0 12 * * *',
+      format(
+        $sql$select net.http_post(
+          url := 'https://radciehalkupwltjuaja.supabase.co/functions/v1/notify-upcoming-posts',
+          headers := jsonb_build_object('Content-Type', 'application/json', 'Authorization', 'Bearer %s'),
+          body := '{}'::jsonb
+        );$sql$,
+        service_key
+      )
+    );
+  end if;
+end $$;

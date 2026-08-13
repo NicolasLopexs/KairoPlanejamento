@@ -91,8 +91,38 @@ inclusive sugerida automaticamente pelo painel.
 
 Se seu projeto Supabase já existia antes dessa função (ex.: o projeto da
 Samhia), volte ao **SQL Editor** e rode o `supabase/schema.sql` de novo —
-é seguro rodar quantas vezes quiser, ele só adiciona a coluna nova
-(`email`) que faltava em `profiles`.
+é seguro rodar quantas vezes quiser, ele só adiciona o que ainda falta
+(colunas novas, funções, etc).
+
+### 3C. Avisos por e-mail (opcional)
+
+O cronograma pode mandar e-mail automático quando um post muda de status,
+e um resumo diário dos posts com data pra amanhã que ainda estão como
+"planejado". Pra ativar:
+
+1. Publique as duas funções extras do jeito do passo 3B: **Edge Functions
+   → Deploy a new function**, uma chamada `notify-status-change` com o
+   conteúdo de
+   [`supabase/functions/notify-status-change/index.ts`](supabase/functions/notify-status-change/index.ts),
+   outra chamada `notify-upcoming-posts` com o conteúdo de
+   [`supabase/functions/notify-upcoming-posts/index.ts`](supabase/functions/notify-upcoming-posts/index.ts).
+2. Crie uma conta grátis em [resend.com](https://resend.com) e gere uma API
+   key.
+3. No Supabase, vá em **Edge Functions → Manage secrets** (ou rode
+   `supabase secrets set RESEND_API_KEY=sua-chave` pelo CLI) e adicione
+   `RESEND_API_KEY` com o valor gerado.
+4. Rode `supabase/schema.sql` no SQL Editor (de novo, é seguro) — isso cria
+   o gatilho de mudança de status e agenda o job diário. As duas extensões
+   que isso usa (`pg_net` e `pg_cron`) precisam estar habilitadas em
+   **Database → Extensions**; se o passo der erro de extensão faltando,
+   habilite as duas lá primeiro e rode de novo.
+5. Em cada cliente, preencha o **e-mail de contato** na aba **Acesso do
+   Cliente** (é um campo separado do e-mail de login, e esse precisa ser
+   real — é pra onde os avisos vão).
+
+Sem a `RESEND_API_KEY` configurada, o gatilho e o job diário continuam
+rodando normalmente, só não conseguem mandar e-mail (falha em silêncio,
+sem quebrar o resto do app).
 
 ### 4. Rodar localmente (opcional, pra testar antes de publicar)
 
@@ -146,5 +176,5 @@ npm run dev
 
 ## O que ainda não tem (próximos passos possíveis)
 
-- Exportar/baixar o cronograma como planilha ou PDF.
+- Exportar como PDF de verdade (hoje só tem CSV — abre liso no Excel/Sheets).
 - Histórico de alterações / quem editou o quê.

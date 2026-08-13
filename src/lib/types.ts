@@ -4,6 +4,14 @@ export type Pillar = 'Jogo' | 'Lifestyle' | 'Bastidores' | 'Engajamento' | 'Insp
 
 export const PILLARS: Pillar[] = ['Jogo', 'Lifestyle', 'Bastidores', 'Engajamento', 'Inspiração']
 
+export const PILLAR_CLASS: Record<Pillar, string> = {
+  Jogo: 'jogo',
+  Lifestyle: 'lifestyle',
+  Bastidores: 'bastidores',
+  Engajamento: 'engajamento',
+  Inspiração: 'inspiracao',
+}
+
 export type PostStatus = 'planejado' | 'gravado' | 'editado' | 'postado'
 
 export const STATUSES: { value: PostStatus; label: string }[] = [
@@ -20,6 +28,7 @@ export interface ClientRow {
   name: string
   slug: string
   archived_at: string | null
+  contact_email: string | null
   created_at: string
 }
 
