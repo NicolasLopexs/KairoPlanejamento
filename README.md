@@ -64,18 +64,31 @@ Você já tem conta no GitHub, Supabase e Netlify — o que falta é criar o
 Repita esse "Add user" pra cada pessoa da sua equipe que vai gerenciar
 clientes.
 
-### 3. Criar o login da Samhia (ou de outro cliente)
+### 3. Criar o login de cada cliente
 
-1. **Authentication → Users → Add user**, com o e-mail da Samhia.
-2. No **SQL Editor**:
+Isso agora é feito direto pelo painel (aba **Acesso do Cliente**, dentro do
+cronograma de cada cliente) — veja o passo 3B abaixo pra publicar a função
+que faz isso antes de usar. O e-mail de login não precisa ser real (pode ser
+algo tipo `samhia-simao@cronograma.local`) e a senha pode ser qualquer coisa,
+inclusive sugerida automaticamente pelo painel.
 
-   ```sql
-   update public.profiles set role = 'client',
-     client_id = (select id from public.clients where slug = 'samhia-simao')
-   where id = (select id from auth.users where email = 'email-da-samhia@exemplo.com');
-   ```
+### 3B. Publicar a função que cria os acessos (uma vez só)
 
-Ela poderá então entrar com esse e-mail/senha e ver só o cronograma dela.
+1. No Supabase, vá em **Edge Functions** (menu lateral) → **Deploy a new
+   function**.
+2. Nome da função: `manage-client-access`.
+3. Cole o conteúdo de
+   [`supabase/functions/manage-client-access/index.ts`](supabase/functions/manage-client-access/index.ts)
+   no editor e clique **Deploy**.
+
+   Não precisa configurar nenhuma variável de ambiente — o Supabase já
+   injeta `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` automaticamente
+   dentro da função.
+
+Se seu projeto Supabase já existia antes dessa função (ex.: o projeto da
+Samhia), volte ao **SQL Editor** e rode o `supabase/schema.sql` de novo —
+é seguro rodar quantas vezes quiser, ele só adiciona a coluna nova
+(`email`) que faltava em `profiles`.
 
 ### 4. Rodar localmente (opcional, pra testar antes de publicar)
 
@@ -120,14 +133,14 @@ npm run dev
    isso pré-popula o guia de stories e a orientação de captação com o padrão
    que já usamos. Sem isso, o cliente começa com as abas vazias e dá pra
    preencher pelo próprio painel (botão **+ Novo dia** / **+ Novo item**).
-3. Repita o passo 3 acima ("Criar o login do cliente") se quiser dar acesso
-   de login pra esse cliente ver/editar o próprio cronograma.
+3. Na aba **Acesso do Cliente** do cronograma desse cliente, crie o login
+   dele — e-mail (pode ser fictício) e senha (pode digitar ou clicar em
+   "Gerar outra"). Copie e envie as credenciais pro cliente, elas só
+   aparecem na tela nesse momento.
 
 ---
 
 ## O que ainda não tem (próximos passos possíveis)
 
-- Fluxo de convite de usuário pela própria interface (hoje é feito pelo
-  painel do Supabase).
 - Exportar/baixar o cronograma como planilha ou PDF.
 - Histórico de alterações / quem editou o quê.

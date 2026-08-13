@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { TopBar } from '../components/TopBar'
 import { Editable } from '../components/Editable'
+import { ClientAccessPanel } from '../components/ClientAccessPanel'
 import { weekOf, weekdayFromDate } from '../lib/weekday'
 import {
   PILLARS,
@@ -16,7 +17,7 @@ import {
   type StoryItem,
 } from '../lib/types'
 
-type Tab = 'feed' | 'stories' | 'captacao'
+type Tab = 'feed' | 'stories' | 'captacao' | 'acesso'
 
 const PILLAR_CLASS: Record<Pillar, string> = {
   Jogo: 'jogo',
@@ -195,6 +196,11 @@ export function ClientCalendar() {
           <button className="tab" aria-selected={tab === 'captacao'} onClick={() => setTab('captacao')}>
             Orientações de Captação
           </button>
+          {canManage && (
+            <button className="tab" aria-selected={tab === 'acesso'} onClick={() => setTab('acesso')}>
+              Acesso do Cliente
+            </button>
+          )}
         </div>
 
         {tab === 'feed' && (
@@ -365,6 +371,8 @@ export function ClientCalendar() {
             </div>
           </section>
         )}
+
+        {tab === 'acesso' && canManage && <ClientAccessPanel client={client} />}
       </main>
     </div>
   )

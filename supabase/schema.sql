@@ -22,8 +22,13 @@ create table if not exists public.profiles (
   role text not null default 'client' check (role in ('staff', 'client')),
   client_id uuid references public.clients (id) on delete set null,
   full_name text,
+  email text,
   created_at timestamptz not null default now()
 );
+
+-- Se a tabela já existia (projeto criado antes desta versão do schema),
+-- garante que a coluna email exista. Seguro rodar de novo quantas vezes quiser.
+alter table public.profiles add column if not exists email text;
 
 -- Cria automaticamente um perfil (role client, sem client_id) quando alguém
 -- se cadastra pelo Supabase Auth. A equipe promove pra staff ou associa a um
@@ -34,8 +39,8 @@ language plpgsql
 security definer set search_path = public
 as $$
 begin
-  insert into public.profiles (id, full_name)
-  values (new.id, new.raw_user_meta_data ->> 'full_name');
+  insert into public.profiles (id, full_name, email)
+  values (new.id, new.raw_user_meta_data ->> 'full_name', new.email);
   return new;
 end;
 $$;
@@ -129,51 +134,65 @@ alter table public.stories_template enable row level security;
 alter table public.capture_guide enable row level security;
 
 -- ---- clients ----
+drop policy if exists "staff manages clients" on public.clients;
 create policy "staff manages clients" on public.clients
   for all using (public.is_staff()) with check (public.is_staff());
 
+drop policy if exists "client reads own client row" on public.clients;
 create policy "client reads own client row" on public.clients
   for select using (id = public.my_client_id());
 
 -- ---- profiles ----
+drop policy if exists "user reads own profile" on public.profiles;
 create policy "user reads own profile" on public.profiles
   for select using (id = auth.uid());
 
+drop policy if exists "staff reads all profiles" on public.profiles;
 create policy "staff reads all profiles" on public.profiles
   for select using (public.is_staff());
 
+drop policy if exists "staff manages profiles" on public.profiles;
 create policy "staff manages profiles" on public.profiles
   for update using (public.is_staff()) with check (public.is_staff());
 
 -- ---- feed_posts ----
+drop policy if exists "staff manages feed_posts" on public.feed_posts;
 create policy "staff manages feed_posts" on public.feed_posts
   for all using (public.is_staff()) with check (public.is_staff());
 
+drop policy if exists "client reads own feed_posts" on public.feed_posts;
 create policy "client reads own feed_posts" on public.feed_posts
   for select using (client_id = public.my_client_id());
 
+drop policy if exists "client updates own feed_posts" on public.feed_posts;
 create policy "client updates own feed_posts" on public.feed_posts
   for update using (client_id = public.my_client_id())
   with check (client_id = public.my_client_id());
 
 -- ---- stories_template ----
+drop policy if exists "staff manages stories_template" on public.stories_template;
 create policy "staff manages stories_template" on public.stories_template
   for all using (public.is_staff()) with check (public.is_staff());
 
+drop policy if exists "client reads own stories_template" on public.stories_template;
 create policy "client reads own stories_template" on public.stories_template
   for select using (client_id = public.my_client_id());
 
+drop policy if exists "client updates own stories_template" on public.stories_template;
 create policy "client updates own stories_template" on public.stories_template
   for update using (client_id = public.my_client_id())
   with check (client_id = public.my_client_id());
 
 -- ---- capture_guide ----
+drop policy if exists "staff manages capture_guide" on public.capture_guide;
 create policy "staff manages capture_guide" on public.capture_guide
   for all using (public.is_staff()) with check (public.is_staff());
 
+drop policy if exists "client reads own capture_guide" on public.capture_guide;
 create policy "client reads own capture_guide" on public.capture_guide
   for select using (client_id = public.my_client_id());
 
+drop policy if exists "client updates own capture_guide" on public.capture_guide;
 create policy "client updates own capture_guide" on public.capture_guide
   for update using (client_id = public.my_client_id())
   with check (client_id = public.my_client_id());
