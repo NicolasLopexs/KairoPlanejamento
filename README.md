@@ -130,8 +130,9 @@ e um resumo diário dos posts com data pra amanhã que ainda estão como
    real — é pra onde os avisos vão).
 
 Sem a `RESEND_API_KEY` configurada, o gatilho e o job diário continuam
-rodando normalmente, só não conseguem mandar e-mail (falha em silêncio,
-sem quebrar o resto do app).
+rodando normalmente, mas não conseguem mandar e-mail — e isso **não** fica
+em silêncio: a falha aparece na aba **Histórico** do cliente afetado,
+destacada em vermelho.
 
 ### 4. Rodar localmente (opcional, pra testar antes de publicar)
 
@@ -165,6 +166,32 @@ npm run dev
    (os mesmos valores do passo 1)
 4. Clique **Deploy site**. A cada `git push`, o Netlify publica uma nova
    versão automaticamente.
+
+### 6B. Testes automatizados e CI (opcional, mas recomendado)
+
+Toda mudança nova (lint + build + testes de ponta a ponta) pode ser checada
+automaticamente antes de ir pro ar, via GitHub Actions
+([`.github/workflows/ci.yml`](.github/workflows/ci.yml)). Pra ativar:
+
+1. Crie um login **staff dedicado só pra teste** (não uma pessoa real) —
+   mesmo processo do passo 2, com um e-mail tipo `e2e-staff@seudominio.local`.
+2. No GitHub, vá em **Settings → Secrets and variables → Actions → New
+   repository secret** e adicione quatro secrets:
+   - `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` (mesmos valores do passo 1)
+   - `E2E_STAFF_EMAIL` e `E2E_STAFF_PASSWORD` (o login criado acima)
+3. Pronto — a partir do próximo push, o GitHub Actions roda sozinho. Dá pra
+   acompanhar na aba **Actions** do repositório.
+
+Pra rodar a mesma suite localmente: preencha `E2E_STAFF_EMAIL` /
+`E2E_STAFF_PASSWORD` no seu `.env.local` (veja `.env.example`) e rode
+`npm run test:e2e`.
+
+**Deploy de preview por Pull Request:** o Netlify já gera automaticamente
+uma URL de teste pra cada Pull Request em repositórios conectados via
+GitHub (normalmente já vem ligado — confirme em **Site configuration →
+Build & deploy → Deploy contexts**). Isso só é útil se o fluxo de trabalho
+usar Pull Requests em vez de `git push` direto na `main`; se preferir
+continuar publicando direto, esse recurso fica ocioso, sem problema.
 
 ### 7. Adicionar um novo cliente depois
 

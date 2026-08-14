@@ -524,3 +524,5 @@ button:focus-visible, [tabindex]:focus-visible, a:focus-visible {
 .log-body { color: var(--ink-soft); }
 .log-body strong { color: var(--ink); }
 .log-table { color: var(--accent); font-weight: 600; }
+.log-row-error { background: color-mix(in srgb, #b3473f 8%, transparent); border-radius: 6px; }
+.log-row-error .log-body { color: #b3473f; }

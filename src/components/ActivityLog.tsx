@@ -6,7 +6,7 @@ import { EmptyState } from './EmptyState'
 interface LogRow {
   id: string
   table_name: string
-  action: 'insert' | 'update' | 'delete'
+  action: 'insert' | 'update' | 'delete' | 'error'
   summary: string
   created_at: string
   profiles: { full_name: string | null; email: string | null } | null
@@ -16,9 +16,10 @@ const TABLE_LABEL: Record<string, string> = {
   feed_posts: 'Feed',
   stories_template: 'Stories',
   capture_guide: 'Captação',
+  notificacoes: 'Notificações',
 }
 
-const ACTION_LABEL: Record<LogRow['action'], string> = {
+const ACTION_LABEL: Record<Exclude<LogRow['action'], 'error'>, string> = {
   insert: 'criou',
   update: 'editou',
   delete: 'removeu',
@@ -62,16 +63,23 @@ export function ActivityLog({ clientId }: { clientId: string }) {
         <EmptyState title="Nenhuma alteração registrada ainda" hint="Assim que algo for criado ou editado, aparece aqui." />
       ) : (
         <div className="log-list">
-          {rows.map((r) => (
-            <div className="log-row" key={r.id}>
-              <span className="log-when">{formatWhen(r.created_at)}</span>
-              <span className="log-body">
-                <strong>{r.profiles?.full_name || r.profiles?.email || 'Alguém'}</strong> {ACTION_LABEL[r.action]} em{' '}
-                <span className="log-table">{TABLE_LABEL[r.table_name] ?? r.table_name}</span>
-                {r.action === 'update' && <> — {r.summary}</>}
-              </span>
-            </div>
-          ))}
+          {rows.map((r) =>
+            r.action === 'error' ? (
+              <div className="log-row log-row-error" key={r.id}>
+                <span className="log-when">{formatWhen(r.created_at)}</span>
+                <span className="log-body">{r.summary}</span>
+              </div>
+            ) : (
+              <div className="log-row" key={r.id}>
+                <span className="log-when">{formatWhen(r.created_at)}</span>
+                <span className="log-body">
+                  <strong>{r.profiles?.full_name || r.profiles?.email || 'Alguém'}</strong> {ACTION_LABEL[r.action]} em{' '}
+                  <span className="log-table">{TABLE_LABEL[r.table_name] ?? r.table_name}</span>
+                  {r.action === 'update' && <> — {r.summary}</>}
+                </span>
+              </div>
+            )
+          )}
         </div>
       )}
     </section>

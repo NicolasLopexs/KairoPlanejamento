@@ -54,7 +54,7 @@ Deno.serve(async () => {
 
   let sent = 0
   const errors: string[] = []
-  for (const [, group] of byClient) {
+  for (const [clientId, group] of byClient) {
     const list = group.items.map((p) => `<li>${p.tema || '(sem tema)'}</li>`).join('')
     try {
       await sendEmail(
@@ -64,7 +64,15 @@ Deno.serve(async () => {
       )
       sent++
     } catch (e) {
-      errors.push(e instanceof Error ? e.message : String(e))
+      const reason = e instanceof Error ? e.message : String(e)
+      errors.push(reason)
+      await admin.from('activity_log').insert({
+        client_id: clientId,
+        table_name: 'notificacoes',
+        row_id: clientId,
+        action: 'error',
+        summary: `Aviso diário de posts próximos não enviado para ${group.email}: ${reason}`,
+      })
     }
   }
 

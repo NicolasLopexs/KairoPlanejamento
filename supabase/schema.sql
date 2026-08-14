@@ -294,11 +294,18 @@ create table if not exists public.activity_log (
   client_id uuid not null,
   table_name text not null,
   row_id uuid not null,
-  action text not null check (action in ('insert', 'update', 'delete')),
+  action text not null check (action in ('insert', 'update', 'delete', 'error')),
   actor_id uuid references public.profiles (id) on delete set null,
   summary text not null,
   created_at timestamptz not null default now()
 );
+
+-- 'error' foi adicionado depois (Fase 4) — as Edge Functions de notificação
+-- registram aqui quando um e-mail falha ao enviar, pra ficar visível na aba
+-- Histórico em vez de falhar em silêncio.
+alter table public.activity_log drop constraint if exists activity_log_action_check;
+alter table public.activity_log add constraint activity_log_action_check
+  check (action in ('insert', 'update', 'delete', 'error'));
 
 alter table public.activity_log drop constraint if exists activity_log_client_id_fkey;
 alter table public.activity_log enable row level security;

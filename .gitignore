@@ -15,6 +15,11 @@ dist-ssr
 # Cache local do Supabase CLI (não é segredo, mas é específico da máquina)
 supabase/.temp/
 
+# Saída dos testes E2E (Playwright)
+/test-results/
+/playwright-report/
+/playwright/.cache/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

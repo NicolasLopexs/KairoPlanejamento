@@ -68,7 +68,15 @@ Deno.serve(async (req) => {
       `<p>O post <strong>${tema}</strong> (${dataFmt}) mudou de <strong>${de}</strong> para <strong>${para}</strong>.</p>`
     )
   } catch (e) {
-    return json({ error: e instanceof Error ? e.message : 'Falha ao enviar e-mail.' }, 500)
+    const reason = e instanceof Error ? e.message : 'Falha ao enviar e-mail.'
+    await admin.from('activity_log').insert({
+      client_id,
+      table_name: 'notificacoes',
+      row_id: post_id,
+      action: 'error',
+      summary: `Aviso de mudança de status não enviado para ${client.contact_email}: ${reason}`,
+    })
+    return json({ error: reason }, 500)
   }
 
   return json({ ok: true })
