@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Editable } from './Editable'
 import { weekdayFromDate } from '../lib/weekday'
 import { PILLAR_CLASS, PILLARS, STATUSES, type FeedPost, type Pillar, type PostStatus } from '../lib/types'
@@ -13,6 +14,14 @@ export function FeedPostCard({
   onUpdate: (id: string, patch: Partial<FeedPost>) => void
   onDelete: (id: string) => void
 }) {
+  const [flashing, setFlashing] = useState<'pillar' | 'status' | null>(null)
+
+  function flash(field: 'pillar' | 'status') {
+    setFlashing(null)
+    requestAnimationFrame(() => setFlashing(field))
+    setTimeout(() => setFlashing((f) => (f === field ? null : f)), 700)
+  }
+
   return (
     <div
       className="card"
@@ -41,7 +50,7 @@ export function FeedPostCard({
         <div className="tag-row">
           <Editable as="span" className="tag" value={post.format} onSave={(v) => onUpdate(post.id, { format: v })} />
           <select
-            className="pillar-select"
+            className={`pillar-select ${flashing === 'pillar' ? 'select-flash' : ''}`}
             value={post.pillar}
             style={
               {
@@ -49,7 +58,10 @@ export function FeedPostCard({
                 '--p-fg': `var(--p-${PILLAR_CLASS[post.pillar]}-fg)`,
               } as React.CSSProperties
             }
-            onChange={(e) => onUpdate(post.id, { pillar: e.target.value as Pillar })}
+            onChange={(e) => {
+              onUpdate(post.id, { pillar: e.target.value as Pillar })
+              flash('pillar')
+            }}
           >
             {PILLARS.map((p) => (
               <option key={p} value={p}>
@@ -68,9 +80,12 @@ export function FeedPostCard({
 
       <div className="card-bottom">
         <select
-          className={`status-select status-${post.status}`}
+          className={`status-select status-${post.status} ${flashing === 'status' ? 'select-flash' : ''}`}
           value={post.status}
-          onChange={(e) => onUpdate(post.id, { status: e.target.value as PostStatus })}
+          onChange={(e) => {
+            onUpdate(post.id, { status: e.target.value as PostStatus })
+            flash('status')
+          }}
         >
           {STATUSES.map((s) => (
             <option key={s.value} value={s.value}>

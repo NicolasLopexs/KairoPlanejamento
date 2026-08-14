@@ -9,6 +9,8 @@ import { FeedPostCard } from '../components/FeedPostCard'
 import { FeedCalendar } from '../components/FeedCalendar'
 import { FeedStats } from '../components/FeedStats'
 import { ActivityLog } from '../components/ActivityLog'
+import { SkeletonCards } from '../components/Skeleton'
+import { EmptyState } from '../components/EmptyState'
 import { weekOf, weekdayFromDate } from '../lib/weekday'
 import { downloadCsv, feedToCsv } from '../lib/csv'
 import {
@@ -46,6 +48,15 @@ export function ClientCalendar() {
   )
   const [draggedStoryId, setDraggedStoryId] = useState<string | null>(null)
   const [draggedCaptureId, setDraggedCaptureId] = useState<string | null>(null)
+  const [dragOverStory, setDragOverStory] = useState<{ id: string; pos: 'before' | 'after' } | null>(null)
+  const [dragOverCapture, setDragOverCapture] = useState<{ id: string; pos: 'before' | 'after' } | null>(null)
+
+  function handleDragOver(e: React.DragEvent<HTMLElement>, id: string, set: (v: { id: string; pos: 'before' | 'after' }) => void) {
+    e.preventDefault()
+    const rect = e.currentTarget.getBoundingClientRect()
+    const pos = e.clientY > rect.top + rect.height / 2 ? 'after' : 'before'
+    set({ id, pos })
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -252,7 +263,20 @@ export function ClientCalendar() {
     })
   }
 
-  if (loading) return <div className="page-loading">Carregando cronograma…</div>
+  if (loading) {
+    return (
+      <div className="app-shell">
+        <div className="topbar">
+          <div className="topbar-inner">
+            <div className="skel-line" style={{ width: 160, height: 22 }} />
+          </div>
+        </div>
+        <main className="page-content">
+          <SkeletonCards />
+        </main>
+      </div>
+    )
+  }
   if (notFound || !client) {
     return (
       <div className="page-loading">
@@ -288,7 +312,7 @@ export function ClientCalendar() {
         </div>
 
         {tab === 'feed' && (
-          <section>
+          <section className="fade-in" key="feed">
             <FeedStats feed={feed} />
 
             <div className="filters-row">
@@ -349,37 +373,49 @@ export function ClientCalendar() {
               </div>
             </div>
 
-            {feed.length === 0 && <p className="muted">Nenhum post cadastrado ainda.</p>}
-            {feed.length > 0 && filteredFeed.length === 0 && <p className="muted">Nenhum post encontrado com esses filtros.</p>}
+            {feed.length === 0 && (
+              <EmptyState
+                title="Nenhum post cadastrado ainda"
+                hint={canManage ? 'Clique em "+ Novo post" acima pra criar o primeiro.' : 'A equipe ainda não adicionou posts aqui.'}
+              />
+            )}
+            {feed.length > 0 && filteredFeed.length === 0 && (
+              <EmptyState title="Nenhum post encontrado" hint="Tente ajustar os filtros de pilar, status ou a busca." />
+            )}
 
-            {feedView === 'lista' &&
-              weeks.map((week) => (
-                <div className="week" key={week.key}>
-                  <div className="week-head">
-                    <span className="wk-range">{week.label}</span>
+            {feedView === 'lista' && (
+              <div className="fade-in" key="lista">
+                {weeks.map((week) => (
+                  <div className="week" key={week.key}>
+                    <div className="week-head">
+                      <span className="wk-range">{week.label}</span>
+                    </div>
+                    <div className="cards">
+                      {week.items.map((item) => (
+                        <FeedPostCard key={item.id} post={item} canManage={canManage} onUpdate={updateFeedPost} onDelete={deleteFeedPost} />
+                      ))}
+                    </div>
                   </div>
-                  <div className="cards">
-                    {week.items.map((item) => (
-                      <FeedPostCard key={item.id} post={item} canManage={canManage} onUpdate={updateFeedPost} onDelete={deleteFeedPost} />
-                    ))}
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
+            )}
 
             {feedView === 'calendario' && (
-              <FeedCalendar
-                feed={filteredFeed}
-                canManage={canManage}
-                onUpdate={updateFeedPost}
-                onDelete={deleteFeedPost}
-                onAddOnDate={(date) => addFeedPost(date)}
-              />
+              <div className="fade-in" key="calendario">
+                <FeedCalendar
+                  feed={filteredFeed}
+                  canManage={canManage}
+                  onUpdate={updateFeedPost}
+                  onDelete={deleteFeedPost}
+                  onAddOnDate={(date) => addFeedPost(date)}
+                />
+              </div>
             )}
           </section>
         )}
 
         {tab === 'stories' && (
-          <section>
+          <section className="fade-in" key="stories">
             <p className="sub">
               Padrão semanal — repetir todas as semanas, usando material de bastidores enviado pelo cliente.
               Arraste os cards pra reordenar.
@@ -389,16 +425,28 @@ export function ClientCalendar() {
                 + Novo dia
               </button>
             )}
+            {stories.length === 0 && (
+              <EmptyState
+                title="Nenhum dia cadastrado ainda"
+                hint={canManage ? 'Clique em "+ Novo dia" acima pra montar o guia semanal.' : 'A equipe ainda não montou o guia de stories.'}
+              />
+            )}
             <div className="story-grid">
               {stories.map((item) => (
                 <div
-                  className={`story-card ${draggedStoryId === item.id ? 'dragging' : ''}`}
+                  className={`story-card ${draggedStoryId === item.id ? 'dragging' : ''} ${dragOverStory?.id === item.id ? `drag-over-${dragOverStory.pos}` : ''}`}
                   key={item.id}
                   draggable
                   onDragStart={() => setDraggedStoryId(item.id)}
-                  onDragEnd={() => setDraggedStoryId(null)}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={() => reorderStories(item.id)}
+                  onDragEnd={() => {
+                    setDraggedStoryId(null)
+                    setDragOverStory(null)
+                  }}
+                  onDragOver={(e) => handleDragOver(e, item.id, setDragOverStory)}
+                  onDrop={() => {
+                    reorderStories(item.id)
+                    setDragOverStory(null)
+                  }}
                 >
                   <Editable as="span" className="story-day" value={item.weekday} onSave={(v) => updateStory(item.id, { weekday: v })} />
                   <Editable as="span" className="story-type" value={item.tipo} onSave={(v) => updateStory(item.id, { tipo: v })} />
@@ -415,23 +463,35 @@ export function ClientCalendar() {
         )}
 
         {tab === 'captacao' && (
-          <section>
+          <section className="fade-in" key="captacao">
             <p className="sub">O que pedir para o cliente gravar/fotografar. Arraste as linhas pra reordenar.</p>
             {canManage && (
               <button className="btn-secondary" onClick={addCapture}>
                 + Novo item
               </button>
             )}
+            {captacao.length === 0 && (
+              <EmptyState
+                title="Nenhum item cadastrado ainda"
+                hint={canManage ? 'Clique em "+ Novo item" acima pra listar o que pedir ao cliente.' : 'A equipe ainda não montou a orientação de captação.'}
+              />
+            )}
             <div className="capture-list">
               {captacao.map((item) => (
                 <div
-                  className={`capture-row ${draggedCaptureId === item.id ? 'dragging' : ''}`}
+                  className={`capture-row ${draggedCaptureId === item.id ? 'dragging' : ''} ${dragOverCapture?.id === item.id ? `drag-over-${dragOverCapture.pos}` : ''}`}
                   key={item.id}
                   draggable
                   onDragStart={() => setDraggedCaptureId(item.id)}
-                  onDragEnd={() => setDraggedCaptureId(null)}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={() => reorderCapture(item.id)}
+                  onDragEnd={() => {
+                    setDraggedCaptureId(null)
+                    setDragOverCapture(null)
+                  }}
+                  onDragOver={(e) => handleDragOver(e, item.id, setDragOverCapture)}
+                  onDrop={() => {
+                    reorderCapture(item.id)
+                    setDragOverCapture(null)
+                  }}
                 >
                   <Editable as="span" className="moment" value={item.momento} onSave={(v) => updateCapture(item.id, { momento: v })} />
                   <Editable className="detail" value={item.detalhe} onSave={(v) => updateCapture(item.id, { detalhe: v })} />

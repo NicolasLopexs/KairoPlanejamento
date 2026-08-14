@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { FeedPostCard } from './FeedPostCard'
 import { PILLAR_CLASS, type FeedPost } from '../lib/types'
 
@@ -73,6 +73,15 @@ export function FeedCalendar({
   const cells = useMemo(() => buildMonthGrid(year, month, feed), [year, month, feed])
   const selectedPost = feed.find((p) => p.id === selectedId) ?? null
 
+  useEffect(() => {
+    if (!selectedId) return
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setSelectedId(null)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [selectedId])
+
   function goPrevMonth() {
     if (month === 0) {
       setYear((y) => y - 1)
@@ -139,7 +148,7 @@ export function FeedCalendar({
 
       {selectedPost && (
         <div className="modal-overlay" onClick={() => setSelectedId(null)}>
-          <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-panel" role="dialog" aria-modal="true" aria-label="Editar post" onClick={(e) => e.stopPropagation()}>
             <button className="modal-close" onClick={() => setSelectedId(null)} aria-label="Fechar">
               ×
             </button>

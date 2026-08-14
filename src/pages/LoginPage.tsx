@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Navigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { ThemeToggle } from '../components/ThemeToggle'
 
 export function LoginPage() {
   const { session, loading } = useAuth()
@@ -23,7 +24,8 @@ export function LoginPage() {
 
   return (
     <div className="login-page">
-      <form className="login-card" onSubmit={handleSubmit}>
+      <ThemeToggle className="theme-toggle theme-toggle-floating" />
+      <form className="login-card fade-in" onSubmit={handleSubmit}>
         <span className="eyebrow">Cronograma de Clientes</span>
         <h1>Entrar</h1>
         <label>

@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { SkeletonRows } from './Skeleton'
+import { EmptyState } from './EmptyState'
 
 interface LogRow {
   id: string
@@ -51,13 +53,13 @@ export function ActivityLog({ clientId }: { clientId: string }) {
   }, [clientId])
 
   return (
-    <section>
+    <section className="fade-in">
       <p className="sub">Últimas 100 alterações neste cliente — feed, stories e orientações de captação.</p>
 
       {loading ? (
-        <p className="muted">Carregando histórico…</p>
+        <SkeletonRows count={4} />
       ) : rows.length === 0 ? (
-        <p className="muted">Nenhuma alteração registrada ainda.</p>
+        <EmptyState title="Nenhuma alteração registrada ainda" hint="Assim que algo for criado ou editado, aparece aqui." />
       ) : (
         <div className="log-list">
           {rows.map((r) => (

@@ -11,6 +11,12 @@ cliente.
   Netlify pra reconhecer mais de um contribuidor Git). Nenhum segredo fica
   no código — chaves reais vivem só em `.env.local` (fora do Git) e nas
   variáveis de ambiente do Netlify.
+- **Tema:** claro/escuro segue o sistema operacional por padrão; o botão de
+  sol/lua no topo troca manualmente e fica salvo no navegador
+  (`localStorage`). Toda animação respeita `prefers-reduced-motion`.
+- **Avisos:** confirmações rápidas (nome salvo, acesso criado, cliente
+  arquivado etc.) aparecem como toast no canto inferior direito — exceto
+  senhas/credenciais reveladas, que ficam fixas na tela até serem copiadas.
 
 ## Como os dados são organizados
 

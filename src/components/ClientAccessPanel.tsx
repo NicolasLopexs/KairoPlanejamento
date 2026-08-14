@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { supabase } from '../lib/supabase'
 import { generatePassword, suggestEmail } from '../lib/password'
+import { SkeletonRows } from './Skeleton'
+import { EmptyState } from './EmptyState'
+import { useToast } from '../contexts/ToastContext'
 import type { ClientRow } from '../lib/types'
 
 interface AccessRow {
@@ -30,10 +33,11 @@ async function callAccessFn(body: Record<string, unknown>) {
 }
 
 export function ClientAccessPanel({ client }: { client: ClientRow }) {
+  const toast = useToast()
   const [accesses, setAccesses] = useState<AccessRow[]>([])
   const [clients, setClients] = useState<ClientRow[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [createError, setCreateError] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [resetPasswords, setResetPasswords] = useState<Record<string, string>>({})
 
@@ -46,7 +50,6 @@ export function ClientAccessPanel({ client }: { client: ClientRow }) {
 
   const [contactEmail, setContactEmail] = useState('')
   const [savingContact, setSavingContact] = useState(false)
-  const [contactMsg, setContactMsg] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -67,35 +70,33 @@ export function ClientAccessPanel({ client }: { client: ClientRow }) {
     setEmail(suggestEmail(client.slug))
     setLastCreated(null)
     setContactEmail(client.contact_email ?? '')
-    setContactMsg(null)
     load()
   }, [client.slug, client.contact_email, load])
 
   async function handleSaveContact(e: FormEvent) {
     e.preventDefault()
     setSavingContact(true)
-    setContactMsg(null)
     const { error } = await supabase
       .from('clients')
       .update({ contact_email: contactEmail.trim() || null })
       .eq('id', client.id)
     setSavingContact(false)
     if (error) {
-      setContactMsg(error.message)
+      toast.error(error.message)
       return
     }
-    setContactMsg('Salvo.')
+    toast.success('E-mail de contato salvo.')
   }
 
   async function handleCreate(e: FormEvent) {
     e.preventDefault()
     if (!email.trim() || !password.trim()) return
     if (password.length < 6) {
-      setError('A senha precisa ter pelo menos 6 caracteres.')
+      setCreateError('A senha precisa ter pelo menos 6 caracteres.')
       return
     }
     setCreating(true)
-    setError(null)
+    setCreateError(null)
     try {
       await callAccessFn({
         action: 'create',
@@ -110,7 +111,7 @@ export function ClientAccessPanel({ client }: { client: ClientRow }) {
       setEmail(suggestEmail(client.slug))
       await load()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao criar acesso.')
+      setCreateError(err instanceof Error ? err.message : 'Erro ao criar acesso.')
     } finally {
       setCreating(false)
     }
@@ -119,12 +120,11 @@ export function ClientAccessPanel({ client }: { client: ClientRow }) {
   async function handleResetPassword(id: string) {
     const newPassword = generatePassword()
     setBusyId(id)
-    setError(null)
     try {
       await callAccessFn({ action: 'reset_password', user_id: id, password: newPassword })
       setResetPasswords((prev) => ({ ...prev, [id]: newPassword }))
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao redefinir senha.')
+      toast.error(err instanceof Error ? err.message : 'Erro ao redefinir senha.')
     } finally {
       setBusyId(null)
     }
@@ -133,12 +133,12 @@ export function ClientAccessPanel({ client }: { client: ClientRow }) {
   async function handleRelink(id: string, newClientId: string) {
     if (newClientId === client.id) return
     setBusyId(id)
-    setError(null)
     try {
       await callAccessFn({ action: 'relink', user_id: id, client_id: newClientId })
+      toast.success('Acesso movido.')
       await load()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao mover acesso.')
+      toast.error(err instanceof Error ? err.message : 'Erro ao mover acesso.')
     } finally {
       setBusyId(null)
     }
@@ -147,7 +147,6 @@ export function ClientAccessPanel({ client }: { client: ClientRow }) {
   async function handleDelete(id: string) {
     if (!confirm('Remover este acesso? O login deixará de funcionar.')) return
     setBusyId(id)
-    setError(null)
     try {
       await callAccessFn({ action: 'delete', user_id: id })
       setResetPasswords((prev) => {
@@ -155,16 +154,17 @@ export function ClientAccessPanel({ client }: { client: ClientRow }) {
         delete next[id]
         return next
       })
+      toast.success('Acesso removido.')
       await load()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao remover acesso.')
+      toast.error(err instanceof Error ? err.message : 'Erro ao remover acesso.')
     } finally {
       setBusyId(null)
     }
   }
 
   return (
-    <section>
+    <section className="fade-in">
       <form className="contact-form" onSubmit={handleSaveContact}>
         <h3>Avisos por e-mail</h3>
         <p className="sub">
@@ -182,7 +182,6 @@ export function ClientAccessPanel({ client }: { client: ClientRow }) {
             {savingContact ? 'Salvando…' : 'Salvar'}
           </button>
         </div>
-        {contactMsg && <p className="account-msg">{contactMsg}</p>}
       </form>
 
       <p className="sub">
@@ -190,12 +189,10 @@ export function ClientAccessPanel({ client }: { client: ClientRow }) {
         precisa ser único no sistema.
       </p>
 
-      {error && <p className="form-error">{error}</p>}
-
       {loading ? (
-        <p className="muted">Carregando acessos…</p>
+        <SkeletonRows count={2} />
       ) : accesses.length === 0 ? (
-        <p className="muted">Nenhum acesso criado ainda para este cliente.</p>
+        <EmptyState title="Nenhum acesso criado ainda" hint="Use o formulário abaixo pra criar o primeiro login." />
       ) : (
         <div className="access-list">
           {accesses.map((a) => (
@@ -225,7 +222,7 @@ export function ClientAccessPanel({ client }: { client: ClientRow }) {
                 </button>
               </div>
               {resetPasswords[a.id] && (
-                <p className="access-credential">
+                <p className="access-credential fade-in">
                   Nova senha: <code>{resetPasswords[a.id]}</code> — copie e envie pro cliente, ela não fica
                   salva aqui.
                 </p>
@@ -262,13 +259,14 @@ export function ClientAccessPanel({ client }: { client: ClientRow }) {
             </button>
           </div>
         </label>
+        {createError && <p className="form-error">{createError}</p>}
         <button className="btn-primary" type="submit" disabled={creating}>
           {creating ? 'Criando…' : 'Criar acesso'}
         </button>
       </form>
 
       {lastCreated && (
-        <p className="access-credential">
+        <p className="access-credential fade-in">
           Acesso criado! E-mail: <code>{lastCreated.email}</code> — Senha: <code>{lastCreated.password}</code>.
           Copie e envie pro cliente agora — essa senha não fica visível de novo depois.
         </p>

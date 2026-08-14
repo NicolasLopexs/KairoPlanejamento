@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { AccountMenu } from './AccountMenu'
+import { ThemeToggle } from './ThemeToggle'
 
 export function TopBar({ title, eyebrow }: { title: string; eyebrow: string }) {
   const { profile, signOut } = useAuth()
@@ -15,6 +16,7 @@ export function TopBar({ title, eyebrow }: { title: string; eyebrow: string }) {
           <h1>{title}</h1>
         </div>
         <div className="topbar-actions">
+          <ThemeToggle />
           {profile && <AccountMenu />}
           <button className="btn-ghost" onClick={() => signOut()}>
             Sair

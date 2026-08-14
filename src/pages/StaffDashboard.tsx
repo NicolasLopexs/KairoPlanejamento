@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { TopBar } from '../components/TopBar'
+import { SkeletonTiles } from '../components/Skeleton'
+import { EmptyState } from '../components/EmptyState'
+import { useToast } from '../contexts/ToastContext'
 import type { ClientRow } from '../lib/types'
 
 function slugify(name: string): string {
@@ -14,6 +17,7 @@ function slugify(name: string): string {
 }
 
 export function StaffDashboard() {
+  const toast = useToast()
   const [clients, setClients] = useState<ClientRow[]>([])
   const [loading, setLoading] = useState(true)
   const [newName, setNewName] = useState('')
@@ -60,7 +64,8 @@ export function StaffDashboard() {
     setBusyId(id)
     const { error } = await supabase.from('clients').update({ archived_at: new Date().toISOString() }).eq('id', id)
     setBusyId(null)
-    if (error) return setError(error.message)
+    if (error) return toast.error(error.message)
+    toast.success('Cliente arquivado.')
     load()
   }
 
@@ -68,7 +73,8 @@ export function StaffDashboard() {
     setBusyId(id)
     const { error } = await supabase.from('clients').update({ archived_at: null }).eq('id', id)
     setBusyId(null)
-    if (error) return setError(error.message)
+    if (error) return toast.error(error.message)
+    toast.success('Cliente reativado.')
     load()
   }
 
@@ -89,20 +95,21 @@ export function StaffDashboard() {
         </form>
         {error && <p className="form-error">{error}</p>}
 
-        {archivedCount > 0 && (
+        {(archivedCount > 0 || showArchived) && (
           <button className="btn-ghost archive-toggle" onClick={() => setShowArchived((v) => !v)}>
             {showArchived ? '← Ver clientes ativos' : `Ver arquivados (${archivedCount})`}
           </button>
         )}
 
         {loading ? (
-          <p className="muted">Carregando clientes…</p>
+          <SkeletonTiles />
         ) : visibleClients.length === 0 ? (
-          <p className="muted">
-            {showArchived ? 'Nenhum cliente arquivado.' : 'Nenhum cliente ainda. Adicione o primeiro acima.'}
-          </p>
+          <EmptyState
+            title={showArchived ? 'Nenhum cliente arquivado' : 'Nenhum cliente ainda'}
+            hint={showArchived ? undefined : 'Use o campo acima pra adicionar o primeiro.'}
+          />
         ) : (
-          <div className="client-grid">
+          <div className="client-grid fade-in">
             {visibleClients.map((c) => (
               <div className="client-tile" key={c.id}>
                 <Link to={`/clientes/${c.slug}`} className="client-tile-link">
