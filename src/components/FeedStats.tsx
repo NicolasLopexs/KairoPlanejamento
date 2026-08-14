@@ -5,11 +5,12 @@ export function FeedStats({ feed }: { feed: FeedPost[] }) {
   const stats = useMemo(() => {
     const todayIso = new Date().toISOString().slice(0, 10)
     const late = feed.filter((p) => p.post_date < todayIso && p.status !== 'postado').length
+    const review = feed.filter((p) => p.needs_review).length
     const byStatus = STATUSES.map((s) => ({ ...s, count: feed.filter((p) => p.status === s.value).length }))
     const byPillar = PILLARS.map((p) => ({ pillar: p, count: feed.filter((f) => f.pillar === p).length })).filter(
       (p) => p.count > 0
     )
-    return { late, byStatus, byPillar }
+    return { late, review, byStatus, byPillar }
   }, [feed])
 
   if (feed.length === 0) return null
@@ -20,6 +21,12 @@ export function FeedStats({ feed }: { feed: FeedPost[] }) {
         <span className="stat-num">{stats.late}</span>
         <span className="stat-label">Atrasado{stats.late === 1 ? '' : 's'}</span>
       </div>
+      {stats.review > 0 && (
+        <div className="stat-tile stat-tile-review">
+          <span className="stat-num">{stats.review}</span>
+          <span className="stat-label">Pra revisar</span>
+        </div>
+      )}
       <div className="stat-group">
         <span className="stat-group-label">Por status</span>
         <div className="stat-chips">

@@ -70,9 +70,12 @@ create table if not exists public.feed_posts (
   tema text not null default '',
   legenda text not null default '',
   status text not null default 'planejado' check (status in ('planejado', 'gravado', 'editado', 'postado')),
+  needs_review boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.feed_posts add column if not exists needs_review boolean not null default false;
 
 create or replace function public.set_updated_at()
 returns trigger language plpgsql as $$

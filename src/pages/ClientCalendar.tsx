@@ -11,6 +11,7 @@ import { FeedStats } from '../components/FeedStats'
 import { ActivityLog } from '../components/ActivityLog'
 import { SkeletonCards } from '../components/Skeleton'
 import { EmptyState } from '../components/EmptyState'
+import { useToast } from '../contexts/ToastContext'
 import { weekOf, weekdayFromDate } from '../lib/weekday'
 import { downloadCsv, feedToCsv } from '../lib/csv'
 import {
@@ -32,8 +33,14 @@ export function ClientCalendar() {
   const { slug } = useParams<{ slug: string }>()
   const { profile } = useAuth()
   const canManage = profile?.role === 'staff'
+  const toast = useToast()
 
   const [client, setClient] = useState<ClientRow | null>(null)
+  const [otherClients, setOtherClients] = useState<ClientRow[]>([])
+  const [duplicateSourceStories, setDuplicateSourceStories] = useState('')
+  const [duplicateSourceCapture, setDuplicateSourceCapture] = useState('')
+  const [duplicatingStories, setDuplicatingStories] = useState(false)
+  const [duplicatingCapture, setDuplicatingCapture] = useState(false)
   const [feed, setFeed] = useState<FeedPost[]>([])
   const [stories, setStories] = useState<StoryItem[]>([])
   const [captacao, setCaptacao] = useState<CaptureItem[]>([])
@@ -93,6 +100,17 @@ export function ClientCalendar() {
       cancelled = true
     }
   }, [slug])
+
+  useEffect(() => {
+    if (!canManage || !client) return
+    supabase
+      .from('clients')
+      .select('*')
+      .is('archived_at', null)
+      .neq('id', client.id)
+      .order('name')
+      .then(({ data }) => setOtherClients((data as ClientRow[]) ?? []))
+  }, [canManage, client])
 
   const filteredFeed = useMemo(() => {
     const q = searchText.trim().toLowerCase()
@@ -194,6 +212,38 @@ export function ClientCalendar() {
     if (error) console.error(error.message)
   }
 
+  async function duplicateStories() {
+    if (!client || !duplicateSourceStories) return
+    if (
+      stories.length > 0 &&
+      !confirm('Este cliente já tem dias cadastrados. Duplicar vai adicionar os dias do outro cliente junto, sem apagar os atuais. Continuar?')
+    )
+      return
+    setDuplicatingStories(true)
+    const { data: source, error: sourceErr } = await supabase
+      .from('stories_template')
+      .select('weekday, tipo, ideia, sort_order')
+      .eq('client_id', duplicateSourceStories)
+      .order('sort_order')
+    if (sourceErr || !source || source.length === 0) {
+      setDuplicatingStories(false)
+      toast.error(sourceErr?.message || 'Esse cliente não tem guia de stories pra duplicar.')
+      return
+    }
+    const { data: inserted, error: insertErr } = await supabase
+      .from('stories_template')
+      .insert(source.map((s) => ({ ...s, client_id: client.id })))
+      .select()
+    setDuplicatingStories(false)
+    if (insertErr) {
+      toast.error(insertErr.message)
+      return
+    }
+    setStories((prev) => [...prev, ...((inserted as StoryItem[]) ?? [])])
+    setDuplicateSourceStories('')
+    toast.success(`${source.length} dia(s) duplicado(s).`)
+  }
+
   function reorderStories(targetId: string) {
     const draggedId = draggedStoryId
     setDraggedStoryId(null)
@@ -239,6 +289,38 @@ export function ClientCalendar() {
     setCaptacao((prev) => prev.filter((c) => c.id !== id))
     const { error } = await supabase.from('capture_guide').delete().eq('id', id)
     if (error) console.error(error.message)
+  }
+
+  async function duplicateCapture() {
+    if (!client || !duplicateSourceCapture) return
+    if (
+      captacao.length > 0 &&
+      !confirm('Este cliente já tem itens cadastrados. Duplicar vai adicionar os itens do outro cliente junto, sem apagar os atuais. Continuar?')
+    )
+      return
+    setDuplicatingCapture(true)
+    const { data: source, error: sourceErr } = await supabase
+      .from('capture_guide')
+      .select('momento, detalhe, sort_order')
+      .eq('client_id', duplicateSourceCapture)
+      .order('sort_order')
+    if (sourceErr || !source || source.length === 0) {
+      setDuplicatingCapture(false)
+      toast.error(sourceErr?.message || 'Esse cliente não tem orientação de captação pra duplicar.')
+      return
+    }
+    const { data: inserted, error: insertErr } = await supabase
+      .from('capture_guide')
+      .insert(source.map((c) => ({ ...c, client_id: client.id })))
+      .select()
+    setDuplicatingCapture(false)
+    if (insertErr) {
+      toast.error(insertErr.message)
+      return
+    }
+    setCaptacao((prev) => [...prev, ...((inserted as CaptureItem[]) ?? [])])
+    setDuplicateSourceCapture('')
+    toast.success(`${source.length} item(ns) duplicado(s).`)
   }
 
   function reorderCapture(targetId: string) {
@@ -421,9 +503,34 @@ export function ClientCalendar() {
               Arraste os cards pra reordenar.
             </p>
             {canManage && (
-              <button className="btn-secondary" onClick={addStory}>
-                + Novo dia
-              </button>
+              <div className="duplicate-row">
+                <button className="btn-secondary" onClick={addStory}>
+                  + Novo dia
+                </button>
+                {otherClients.length > 0 && (
+                  <>
+                    <select
+                      className="duplicate-select"
+                      value={duplicateSourceStories}
+                      onChange={(e) => setDuplicateSourceStories(e.target.value)}
+                    >
+                      <option value="">Duplicar de…</option>
+                      {otherClients.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      className="btn-ghost"
+                      disabled={!duplicateSourceStories || duplicatingStories}
+                      onClick={duplicateStories}
+                    >
+                      {duplicatingStories ? 'Duplicando…' : 'Duplicar guia'}
+                    </button>
+                  </>
+                )}
+              </div>
             )}
             {stories.length === 0 && (
               <EmptyState
@@ -466,9 +573,34 @@ export function ClientCalendar() {
           <section className="fade-in" key="captacao">
             <p className="sub">O que pedir para o cliente gravar/fotografar. Arraste as linhas pra reordenar.</p>
             {canManage && (
-              <button className="btn-secondary" onClick={addCapture}>
-                + Novo item
-              </button>
+              <div className="duplicate-row">
+                <button className="btn-secondary" onClick={addCapture}>
+                  + Novo item
+                </button>
+                {otherClients.length > 0 && (
+                  <>
+                    <select
+                      className="duplicate-select"
+                      value={duplicateSourceCapture}
+                      onChange={(e) => setDuplicateSourceCapture(e.target.value)}
+                    >
+                      <option value="">Duplicar de…</option>
+                      {otherClients.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      className="btn-ghost"
+                      disabled={!duplicateSourceCapture || duplicatingCapture}
+                      onClick={duplicateCapture}
+                    >
+                      {duplicatingCapture ? 'Duplicando…' : 'Duplicar guia'}
+                    </button>
+                  </>
+                )}
+              </div>
             )}
             {captacao.length === 0 && (
               <EmptyState

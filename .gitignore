@@ -19,6 +19,7 @@ supabase/.temp/
 /test-results/
 /playwright-report/
 /playwright/.cache/
+.tmp-icon-gen/
 
 # Editor directories and files
 .vscode/*

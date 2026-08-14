@@ -51,6 +51,7 @@ export interface FeedPost {
   tema: string
   legenda: string
   status: PostStatus
+  needs_review: boolean
   created_at: string
   updated_at: string
 }

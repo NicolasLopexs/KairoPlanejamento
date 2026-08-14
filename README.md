@@ -17,6 +17,8 @@ cliente.
 - **Avisos:** confirmações rápidas (nome salvo, acesso criado, cliente
   arquivado etc.) aparecem como toast no canto inferior direito — exceto
   senhas/credenciais reveladas, que ficam fixas na tela até serem copiadas.
+- **Instalável (PWA):** em Chrome/Android e Safari/iOS dá pra "Adicionar à
+  tela inicial" — abre em tela cheia, com ícone próprio.
 
 ## Como os dados são organizados
 
@@ -213,3 +215,5 @@ continuar publicando direto, esse recurso fica ocioso, sem problema.
 ## O que ainda não tem (próximos passos possíveis)
 
 - Exportar como PDF de verdade (hoje só tem CSV — abre liso no Excel/Sheets).
+- Restringir qual staff vê quais clientes (hoje todo staff vê todos — só
+  relevante se a equipe crescer bastante).

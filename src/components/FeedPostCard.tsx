@@ -24,7 +24,7 @@ export function FeedPostCard({
 
   return (
     <div
-      className="card"
+      className={`card ${post.needs_review ? 'card-needs-review' : ''}`}
       style={
         {
           '--p-bg': `var(--p-${PILLAR_CLASS[post.pillar]}-bg)`,
@@ -33,7 +33,19 @@ export function FeedPostCard({
         } as React.CSSProperties
       }
     >
+      {post.needs_review && <span className="review-badge">Revisar</span>}
       <div className="card-top">
+        <button
+          className={`review-toggle ${post.needs_review ? 'review-toggle-on' : ''}`}
+          onClick={() => onUpdate(post.id, { needs_review: !post.needs_review })}
+          aria-label={post.needs_review ? 'Desmarcar revisão' : 'Marcar pra revisar'}
+          title={post.needs_review ? 'Desmarcar revisão' : 'Marcar pra revisar'}
+        >
+          <svg viewBox="0 0 24 24" width="14" height="14" fill={post.needs_review ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M5 3v18" />
+            <path d="M5 4h13l-3 4 3 4H5" />
+          </svg>
+        </button>
         <div className="date-badge">
           <input
             type="date"
